@@ -4,6 +4,7 @@ use pbr::ProgressBar;
 
 mod vector3;
 mod colour;
+mod ray;
 
 // Define constants related to the render output
 const WIDTH: usize = 256;
