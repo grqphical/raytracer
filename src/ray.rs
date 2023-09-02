@@ -13,7 +13,14 @@ impl Ray {
             direction: Vector3::new(),
         }
     }
-
+    
+    /// Creates a ray from an origin and direction
+    pub fn from(origin: Vector3, direction: Vector3) -> Self {
+        Self {
+            origin,
+            direction
+        }
+    }
     /// Gets a point on the ray based on a given T value. Uses the formula *P(t) = A + tB*
     /// 
     /// ## Arguments

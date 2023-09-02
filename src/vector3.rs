@@ -102,6 +102,28 @@ impl ops::Mul<Vector3> for f64 {
     }
 }
 
+impl ops::Mul<Vector3> for usize {
+    type Output = Vector3;
+    fn mul(self, rhs: Vector3) -> Self::Output {
+        Self::Output {
+            x: self as f64 * rhs.x,
+            y: self as f64 * rhs.y,
+            z: self as f64 * rhs.z,
+        }
+    }
+}
+
+impl ops::Mul<Vector3> for i64 {
+    type Output = Vector3;
+    fn mul(self, rhs: Vector3) -> Self::Output {
+        Self::Output {
+            x: self as f64 * rhs.x,
+            y: self as f64 * rhs.y,
+            z: self as f64 * rhs.z,
+        }
+    }
+}
+
 impl ops::Div<f64> for Vector3 {
     type Output = Self;
     fn div(self, rhs: f64) -> Self::Output {
@@ -111,7 +133,7 @@ impl ops::Div<f64> for Vector3 {
 
 impl Vector3 {
     /// Creates an empty Vector
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             x: 0.0,
             y: 0.0,
@@ -125,7 +147,7 @@ impl Vector3 {
     /// - `x` X Coordinate of the Vector
     /// - `y` Y Coordinate of the Vector
     /// - `z` Z Coordinate of the Vector
-    pub fn from(x: f64, y: f64, z: f64) -> Self {
+    pub const fn from(x: f64, y: f64, z: f64) -> Self {
         Self {
             x,
             y,
@@ -140,7 +162,11 @@ impl Vector3 {
     
     /// Returns the length of the vector squared
     pub fn length_squared(&self) -> f64 {
-        return self.x * self.x + self.y * self.y + self.x * self.z;
+        return self.x * self.x + self.y * self.y + self.z * self.z;
+    }
+
+    pub fn unit(&self) -> Self {
+        return *self / self.length();
     }
 }
 
