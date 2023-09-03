@@ -1,8 +1,10 @@
 use std::fs;
+use std::time::{Duration, Instant};
 
 use pbr::ProgressBar;
 
-use crate::{hittable::{Hittable, HitRecord}, colour::Colour, interval::Interval, ray::Ray, vector3::Vector3, random::random_f64};
+use crate::vector3::random_unit_vector;
+use crate::{hittable::{Hittable, HitRecord}, colour::Colour, interval::Interval, ray::Ray, vector3::{Vector3, random_on_hemisphere}, random::random_f64};
 
 pub struct Camera {
     pub aspect_ratio: f64,
@@ -13,19 +15,21 @@ pub struct Camera {
     pub pixel_delta_u: Vector3,
     pub pixel_delta_v: Vector3,
     pub samples_per_pixel: i64,
+    pub depth_limit: u64,
 }
 
 impl Default for Camera {
     fn default() -> Self {
         Self {
-            aspect_ratio: 0.0,
-            image_width: 0,
+            aspect_ratio: 1.0,
+            image_width: 100,
             image_height: 0,
             center: Vector3::new(),
             pixel00_loc: Vector3::new(),
             pixel_delta_u: Vector3::new(),
             pixel_delta_v: Vector3::new(),
-            samples_per_pixel: 0,
+            samples_per_pixel: 10,
+            depth_limit: 10,
         }
     }
 }
@@ -61,6 +65,7 @@ impl Camera {
     }
 
     pub fn render(&mut self, world: &mut dyn Hittable) {
+        let start_time = Instant::now();
         self.init();
 
         // Represents the final PPM data
@@ -77,7 +82,7 @@ impl Camera {
                 let mut pixel_colour = Colour::new();
                 for _ in 0..self.samples_per_pixel {
                     let r = self.get_ray(i, j);
-                    pixel_colour += self.ray_colour(&r, world);
+                    pixel_colour += self.ray_colour(&r, self.depth_limit, world);
                 }
 
                 let mut pixel_data = String::new();
@@ -89,16 +94,21 @@ impl Camera {
             }
             pb.inc();
         }
-        pb.finish_println("Rendered");
+        let end_time = start_time.elapsed();
+        pb.finish_println(&format!("Rendered in {} seconds", end_time.as_secs()));
 
         // Write the output string to the file
         fs::write("output.ppm", data).expect("Error writing to file");
     }
 
-    fn ray_colour(&self, r: &Ray, world: &mut dyn Hittable) -> Colour {
+    fn ray_colour(&self, r: &Ray, depth_limit: u64, world: &mut dyn Hittable) -> Colour {
+        if depth_limit <= 0 { return Colour::new() }
+
         let mut record = HitRecord::new();
-        if world.hit(r, Interval::from(0.0, f64::INFINITY), &mut record) {
-            return 0.5 * (record.normal + Colour::from(1.0, 1.0, 1.0))
+
+        if world.hit(r, Interval::from(0.001, f64::INFINITY), &mut record) {
+            let direction = record.normal + random_unit_vector();
+            return 0.5 * self.ray_colour(&Ray::from(record.point, direction), depth_limit - 1, world);
         }
 
         let unit_dir = r.direction.unit();

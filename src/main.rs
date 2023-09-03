@@ -22,8 +22,9 @@ fn main() {
     let mut cam: Camera = Camera {..Default::default()};
 
     cam.aspect_ratio = 16.0 / 9.0;
-    cam.image_width = 400;
+    cam.image_width = 800;
     cam.samples_per_pixel = 100;
+    cam.depth_limit = 50;
 
     cam.render(&mut world);
 }

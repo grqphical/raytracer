@@ -1,5 +1,7 @@
 use std::{ops, fmt::Display};
 
+use crate::random::{random_f64, random_f64_in_range};
+
 #[derive(Copy, Clone)]
 pub struct Vector3 {
     pub x: f64,
@@ -155,6 +157,22 @@ impl Vector3 {
         }
     }
 
+    pub fn random() -> Self {
+        Self {
+            x: random_f64(),
+            y: random_f64(),
+            z: random_f64()
+        }
+    }
+
+    pub fn random_in_range(min: f64, max: f64) -> Self {
+        Self {
+            x: random_f64_in_range(min, max),
+            y: random_f64_in_range(min, max),
+            z: random_f64_in_range(min, max)
+        }
+    }
+
     /// Returns the length of the Vector
     pub fn length(&self) -> f64 {
         return self.length_squared().sqrt()
@@ -167,7 +185,7 @@ impl Vector3 {
 
     pub fn unit(&self) -> Self {
         return *self / self.length();
-    }
+    } 
 }
 
 /// Finds the dot product of two Vectors
@@ -186,4 +204,27 @@ pub fn dot_product(a: Vector3, b: Vector3) -> f64 {
 /// - `b` The Second Vector of the product
 pub fn cross_product(a: Vector3, b: Vector3) -> Vector3 {
     return Vector3 { x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z , z: a.x * b.y - a.y * b.x }
+}
+
+pub fn random_in_unit_sphere() -> Vector3 {
+        loop {
+            let p = Vector3::random_in_range(-1.0, 1.0);
+
+            if p.length_squared() < 1.0 {
+                return p;
+            }
+        }
+}
+
+pub fn random_unit_vector() -> Vector3 {
+    return random_in_unit_sphere().unit();
+}
+
+pub fn random_on_hemisphere(normal: Vector3) -> Vector3 {
+    let on_unit_sphere = random_unit_vector();
+    if dot_product(on_unit_sphere, normal) > 0.0 {
+        return on_unit_sphere;
+    } else {
+        return -on_unit_sphere
+    }
 }

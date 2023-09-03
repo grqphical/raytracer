@@ -2,6 +2,10 @@ use crate::{vector3::Vector3, interval::Interval};
 
 pub type Colour = Vector3;
 
+fn linear_to_gamma(linear_component: f64) -> f64 {
+    return linear_component.sqrt();
+}
+
 impl Colour {
     /// Writes the pixel data to a string
     /// 
@@ -15,6 +19,10 @@ impl Colour {
         r *= scale;
         b *= scale;
         g *= scale;
+
+        r = linear_to_gamma(r);
+        b = linear_to_gamma(b);
+        g = linear_to_gamma(g);
 
         let intensity = Interval::from(0.000, 0.999);
         let output = format!("{} {} {}\n", (256.0 * intensity.clamp(r)) as i64, (256.0 * intensity.clamp(g)) as i64, (256.0 * intensity.clamp(b)) as i64);
