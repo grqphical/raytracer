@@ -1,11 +1,16 @@
-use std::fs;
-use std::time::{Duration, Instant};
-
+use std::time::Instant;
 use pbr::ProgressBar;
+use crate::viewer::show_image;
+use crate::{hittable::{Hittable, HitRecord}, colour::Colour, interval::Interval, ray::Ray, vector3::Vector3, random::random_f64};
 
-use crate::vector3::random_unit_vector;
-use crate::{hittable::{Hittable, HitRecord}, colour::Colour, interval::Interval, ray::Ray, vector3::{Vector3, random_on_hemisphere}, random::random_f64};
+/// Calculates the average of a Vector of u128
+fn average(numbers: &[u128]) -> u128 {
+    let sum: u128 = numbers.iter().sum();
+    let count: u128 = numbers.len() as u128;
+    sum / count
+}
 
+/// Represents a camera in the raytracer
 pub struct Camera {
     pub aspect_ratio: f64,
     pub image_width: i64,
@@ -35,6 +40,7 @@ impl Default for Camera {
 }
 
 impl Camera {
+    /// Initalize the camera 
     fn init(&mut self) {
         self.image_height = (self.image_width as f64 / self.aspect_ratio) as i64;
         if self.image_height < 1 {
@@ -63,21 +69,30 @@ impl Camera {
 
         self.pixel00_loc = viewport_upper_left + 0.5 * (self.pixel_delta_u + self.pixel_delta_v);
     }
-
+    
+    /// Render the scene
+    ///
+    /// ## Arguments
+    ///
+    /// - `world` HittableList of objects in the scene
     pub fn render(&mut self, world: &mut dyn Hittable) {
         let start_time = Instant::now();
         self.init();
 
-        // Represents the final PPM data
-        let mut data = String::new();
+        // Represents final pixel data
+        let mut data: Vec<u32> = vec![];
+
+        // Vector to store scanline times to be used to calculate average at end
+        let mut scanline_durations: Vec<u128> = Vec::new();
+
+        println!("\nStarting Render at {}x{} pixels", self.image_width, self.image_height);
 
         // Create a progressbar to keep track of the render
-        let mut pb = ProgressBar::new(self.image_height as u64);        
-
-        // Push the header to the final data
-        data.push_str(&format!("P3\n{} {}\n255\n", self.image_width, self.image_height));
+        let mut pb = ProgressBar::new(self.image_height as u64);
+        pb.message("Rendering scanline: ");
 
         for j in 0..self.image_height {
+            let scanline_start = Instant::now();
             for i in 0..self.image_width {
                 let mut pixel_colour = Colour::new();
                 for _ in 0..self.samples_per_pixel {
@@ -85,20 +100,21 @@ impl Camera {
                     pixel_colour += self.ray_colour(&r, self.depth_limit, world);
                 }
 
-                let mut pixel_data = String::new();
-                pixel_colour.write_colour(&mut pixel_data, self.samples_per_pixel);
-
-
-                // Write the pixel data to the output string
-                data.push_str(&pixel_data); 
+                pixel_colour.write_colour_pixels(&mut data, self.samples_per_pixel);
+                let scanline_duration = scanline_start.elapsed();
+                scanline_durations.push(scanline_duration.as_millis());
             }
             pb.inc();
         }
-        let end_time = start_time.elapsed();
-        pb.finish_println(&format!("Rendered in {} seconds", end_time.as_secs()));
 
-        // Write the output string to the file
-        fs::write("output.ppm", data).expect("Error writing to file");
+        let end_time = start_time.elapsed();
+        pb.finish_println(&format!("Rendered in {} seconds\n", end_time.as_secs()));
+        let average_scanline_time: u128 = average(&scanline_durations);
+        println!("Average scanline render time: {average_scanline_time} ms\n");
+
+        print!("\x1B[0m");
+
+        show_image(&mut data, self.image_width as usize, self.image_height as usize);
     }
 
     fn ray_colour(&self, r: &Ray, depth_limit: u64, world: &mut dyn Hittable) -> Colour {
@@ -107,10 +123,16 @@ impl Camera {
         let mut record = HitRecord::new();
 
         if world.hit(r, Interval::from(0.001, f64::INFINITY), &mut record) {
-            let direction = record.normal + random_unit_vector();
-            return 0.5 * self.ray_colour(&Ray::from(record.point, direction), depth_limit - 1, world);
-        }
+           let mut scattered = Ray::new();
+           let mut attenuation = Colour::new();
+           let mut material = record.material.clone();
 
+           if material.scatter(r, &mut record, &mut attenuation, &mut scattered) { 
+               return attenuation * self.ray_colour(&scattered, depth_limit - 1, world);
+           } 
+
+           return Colour::new();
+        }
         let unit_dir = r.direction.unit();
         let a = 0.5 * (unit_dir.y + 1.0);
 

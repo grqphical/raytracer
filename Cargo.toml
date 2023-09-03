@@ -8,3 +8,5 @@ edition = "2021"
 [dependencies]
 pbr = "1.1.1"
 rand  = "0.8.5"
+minifb = "0.25"
+

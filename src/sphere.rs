@@ -1,13 +1,20 @@
-use crate::{Vector3, ray::Ray, vector3::dot_product, hittable::{Hittable, HitRecord}, interval::Interval};
+use crate::{
+    hittable::{HitRecord, Hittable},
+    interval::Interval,
+    material::Material,
+    ray::Ray,
+    vector3::dot_product,
+    Vector3,
+};
 
 pub struct Sphere {
     pub center: Vector3,
-    pub radius: f64
+    pub radius: f64,
+    pub material: Box<dyn Material>,
 }
 
-
 impl Hittable for Sphere {
-    /// Checks if a ray intersects with a sphere using the formula *-b + √b * b - 4ac / 2a* 
+    /// Checks if a ray intersects with a sphere using the formula *-b + √b * b - 4ac / 2a*
     fn hit(&mut self, ray: &Ray, ray_t: Interval, rec: &mut HitRecord) -> bool {
         let oc = ray.origin - self.center;
 
@@ -17,7 +24,9 @@ impl Hittable for Sphere {
 
         let discriminant = half_b * half_b - a * c;
 
-        if discriminant < 0.0 { return false; }
+        if discriminant < 0.0 {
+            return false;
+        }
         let sqrtd = discriminant.sqrt();
 
         let mut root = (-half_b - sqrtd) / a;
@@ -32,6 +41,7 @@ impl Hittable for Sphere {
         rec.point = ray.at(rec.t);
         let outward_normal = (rec.point - self.center) / self.radius;
         rec.set_face_normal(ray, outward_normal);
+        rec.material = self.material.clone();
 
         return true;
     }
