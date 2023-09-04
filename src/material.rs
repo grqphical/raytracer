@@ -1,10 +1,11 @@
 use crate::{ray::Ray, hittable::HitRecord, colour::Colour, vector3::{random_unit_vector, reflect, dot_product, refract, Vector3}, random::random_f64};
 
-pub trait Material: MaterialClone {
+
+pub trait Material: MaterialClone + Send + Sync {
     fn scatter(&mut self, ray_in: &Ray, record: &HitRecord, attenuation: &mut Colour, scattered: &mut Ray) -> bool;
 }
 
-trait MaterialClone {
+pub trait MaterialClone {
     fn clone_box(&self) -> Box<dyn Material>;
 }
 

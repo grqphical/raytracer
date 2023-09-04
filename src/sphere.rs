@@ -6,7 +6,7 @@ use crate::{
     vector3::dot_product,
     Vector3,
 };
-
+#[derive(Clone)]
 pub struct Sphere {
     pub center: Vector3,
     pub radius: f64,

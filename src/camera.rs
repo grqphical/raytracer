@@ -1,18 +1,23 @@
+use std::sync::{mpsc, Mutex, Arc};
+use std::io::Write;
+use std::thread::{self, JoinHandle};
 use std::time::Instant;
-use pbr::ProgressBar;
+use crate::hittable_list::HittableList;
 use crate::save;
 use crate::vector3::{cross_product, random_in_unit_disk};
 use crate::viewer::show_image;
 use crate::{hittable::{Hittable, HitRecord}, colour::Colour, interval::Interval, ray::Ray, vector3::Vector3, random::random_f64};
 
-/// Calculates the average of a Vector of u128
-fn average(numbers: &[u128]) -> u128 {
-    let sum: u128 = numbers.iter().sum();
-    let count: u128 = numbers.len() as u128;
-    sum / count
+/// Represents a scanline being transfered between threads
+/// id is which row of the image the scanline is from
+#[derive(Clone)]
+struct ScanlineResult {
+    id: usize,
+    scanline: Vec<u32>,
 }
 
 /// Represents a camera in the raytracer
+#[derive(Copy, Clone)]
 pub struct Camera {
     pub aspect_ratio: f64,
     pub image_width: i64,
@@ -107,48 +112,79 @@ impl Camera {
     /// ## Arguments
     ///
     /// - `world` HittableList of objects in the scene
-    pub fn render(&mut self, world: &mut dyn Hittable) {
+    pub fn render(&mut self, world: HittableList) {
         let start_time = Instant::now();
         self.init();
 
         // Represents final pixel data
-        let mut data: Vec<u32> = vec![];
+        // I used a 2D Vector because I wanted to ensure there wouldn't be any race conditions and each thread will know where to
+        // output it's data
+        let mut data: Vec<Vec<u32>> = vec![Vec::new(); self.image_height as usize];
 
-        // Vector to store scanline times to be used to calculate average at end
-        let mut scanline_durations: Vec<u128> = Vec::new();
+        // List of thread handles that we can loop over and join
+        let mut handles: Vec<JoinHandle<_>> = vec![];
 
-        println!("\nStarting Render at {}x{} pixels", self.image_width, self.image_height);
-
-        // Create a progressbar to keep track of the render
-        let mut pb = ProgressBar::new(self.image_height as u64);
-        pb.message("Rendering scanline: ");
+        println!("\nStarting Render at {}x{} pixels with {} samples", self.image_width, self.image_height, self.samples_per_pixel);
+        // Create a channel to send pixel data between threads
+        let (pixel_tx, pixel_rx) = mpsc::channel::<ScanlineResult>();
 
         for j in 0..self.image_height {
-            let scanline_start = Instant::now();
-            for i in 0..self.image_width {
-                let mut pixel_colour = Colour::new();
-                for _ in 0..self.samples_per_pixel {
-                    let r = self.get_ray(i, j);
-                    pixel_colour += self.ray_colour(&r, self.depth_limit, world);
-                }
+            // Clone variables in order to be used in different threads
+            let camera_clone = self.clone();
+            let mut world_clone = world.clone();
+            let pixel_transmitter = Arc::new(Mutex::new(pixel_tx.clone()));
+            let mut colour_data: Vec<u32> = vec![];
 
-                pixel_colour.write_colour_pixels(&mut data, self.samples_per_pixel);
-                let scanline_duration = scanline_start.elapsed();
-                scanline_durations.push(scanline_duration.as_millis());
+            let handle = thread::spawn(move || {
+                colour_data.clear();
+                for i in 0..camera_clone.image_width { 
+                    let mut pixel_colour = Colour::new();
+                    for _ in 0..camera_clone.samples_per_pixel {
+                        let r = camera_clone.get_ray(i, j);
+                        pixel_colour += camera_clone.ray_colour(&r, camera_clone.depth_limit, &mut world_clone);
+                    }
+                    
+                    // Write the pixel data to the temporary colour data buffer
+                    pixel_colour.write_colour_pixels(&mut colour_data, camera_clone.samples_per_pixel);             
+               }
+                // Send scanline back to main thread
+                pixel_transmitter.lock().unwrap().send(ScanlineResult { id: j as usize, scanline: colour_data }).unwrap();
+            });
+
+            handles.push(handle);
+        }
+
+        let mut current_complete_count = 1;
+        for handle in handles {
+            handle.join().unwrap();
+
+            // Recieve pixel data
+            let result = pixel_rx.recv().unwrap();
+            print!("\rScanlines Completed: {}/{}", current_complete_count, self.image_height);
+            std::io::stdout().flush().unwrap();
+            current_complete_count += 1;
+
+            // Append it to the 2D array used to represent the image
+            for colour in result.scanline {
+                data[result.id].push(colour);
             }
-            pb.inc();
         }
 
         let end_time = start_time.elapsed();
-        pb.finish_println(&format!("Rendered in {} seconds\n", end_time.as_secs()));
-        let average_scanline_time: u128 = average(&scanline_durations);
-        println!("Average scanline render time: {average_scanline_time} ms\n");
+        let mut final_data: Vec<u32> = vec![];
 
+        // Convert 2D array into 1D array
+        for mut row in data {
+            final_data.append(&mut row);
+        }
+
+        println!("\nRendered in {} seconds", end_time.as_secs());
         print!("\x1B[0m");
 
-        save::save_u32_vector_to_png("render.png", self.image_width as u32, self.image_height as u32, &data).unwrap();
+        save::save_u32_vector_to_png("render.png", self.image_width as u32, self.image_height as u32, &final_data).unwrap();
+        println!("Saved as 'render.png'");
 
-        show_image(&mut data, self.image_width as usize, self.image_height as usize);
+        show_image(&mut final_data, self.image_width as usize, self.image_height as usize);
     }
 
     fn ray_colour(&self, r: &Ray, depth_limit: u64, world: &mut dyn Hittable) -> Colour {

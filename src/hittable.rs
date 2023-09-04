@@ -19,7 +19,7 @@ impl HitRecord {
     pub fn set_face_normal(&mut self, ray: &Ray, outward_normal: Vector3) {
         self.front_face = dot_product(ray.direction, outward_normal) < 0.0;
         if self.front_face  {          
-            self.normal = outward_normal;
+            self.normal = outward_normal;      
         } else {
             self.normal = -outward_normal;
         }
@@ -37,6 +37,22 @@ impl HitRecord {
     }
 }
 
-pub trait Hittable {
+pub trait Hittable: Send + Sync + HittableClone  {
     fn hit(&mut self, ray: &Ray, ray_t: Interval, rec: &mut HitRecord) -> bool;
+}
+
+trait HittableClone {
+    fn clone_hittable(&self) -> Box<dyn Hittable>;
+}
+
+impl<T> HittableClone for T where T: 'static + Hittable + Clone {
+    fn clone_hittable(&self) -> Box<dyn Hittable> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn Hittable> {
+    fn clone(&self) -> Box<dyn Hittable> {
+        self.clone_hittable()
+    }
 }

@@ -23,19 +23,36 @@ mod material;
 mod save;
 
 fn main() {
-    let mut width_input = String::new();
+    let mut input = String::new();
 
     print!("\x1B[2J\x1B[1;1H");
-    print!("\x1B[37m");
-    print!("How wide do you want your image?: ");
+    print!("\x1B[38;2;255;127;80m");
+    print!("How many pixels wide do you want your image?: ");
 
     std::io::stdout().flush().unwrap();
         
-    std::io::stdin().read_line(&mut width_input).unwrap();
+    std::io::stdin().read_line(&mut input).unwrap();
 
     let width: i64;
-    match width_input.trim().parse::<i64>() {
+    let samples: i64;
+
+    match input.trim().parse::<i64>() {
         Ok(val) => width = val,
+        Err(err) => {
+            eprintln!("ERROR: {}", err.to_string());
+            std::process::exit(1);
+        }
+    }
+    print!("\x1B[38;2;255;215;0m");
+    print!("How many samples per pixel do you want? (higher = more render time): ");
+
+    std::io::stdout().flush().unwrap();
+
+    input.clear();
+    std::io::stdin().read_line(&mut input).unwrap();
+
+    match input.trim().parse::<i64>() {
+        Ok(val) => samples = val,
         Err(err) => {
             eprintln!("ERROR: {}", err.to_string());
             std::process::exit(1);
@@ -79,7 +96,6 @@ fn main() {
 
     let material2 = Box::new(Lambertian::new(Colour::from(0.4, 0.2, 0.1)));
     world.add(Box::new(Sphere {center: Vector3::from(-4.0, 1.0, 0.0), radius: 1.0, material: material2}));
-
     let material3 = Box::new(Metal::new(Colour::from(0.7, 0.6, 0.5), 0.0));
     world.add(Box::new(Sphere {center: Vector3::from(4.0, 1.0, 0.0), radius: 1.0, material: material3}));
      
@@ -89,7 +105,7 @@ fn main() {
     // Render settings
     cam.aspect_ratio = 16.0 / 9.0;
     cam.image_width = width;
-    cam.samples_per_pixel = 500;
+    cam.samples_per_pixel = samples;
     cam.depth_limit = 50;
 
     cam.vfov = 20.0;
@@ -101,5 +117,6 @@ fn main() {
     cam.focus_dist = 10.0;
     
     // Render the scene
-    cam.render(&mut world);
+    print!("\x1B[38;2;255;255;255m");
+    cam.render(world);
 }
