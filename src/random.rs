@@ -15,6 +15,6 @@ pub fn random_f64() -> f64 {
 ///
 /// ## Arguments
 /// - `range` Range of numbers to generate within 
-pub fn random_f64_in_range(range: &Range<f64>) -> f64 {
+pub fn random_f64_in_range(range: Range<f64>) -> f64 {
     return range.start + (range.end-range.start) * random_f64();
 }

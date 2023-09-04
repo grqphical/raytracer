@@ -172,9 +172,9 @@ impl Vector3 {
     /// - `range` Range of numbers to generate within
     pub fn random_in_range(range: Range<f64>) -> Self {
         Self {
-            x: random_f64_in_range(&range),
-            y: random_f64_in_range(&range),
-            z: random_f64_in_range(&range)
+            x: random_f64_in_range(range.clone()),
+            y: random_f64_in_range(range.clone()),
+            z: random_f64_in_range(range)
         }
     }
 
@@ -251,4 +251,23 @@ pub fn random_on_hemisphere(normal: Vector3) -> Vector3 {
 /// Reflects a vector and a normal
 pub fn reflect(v: Vector3, n: Vector3) -> Vector3 {
     return v - 2.0 * dot_product(v, n) * n;
+}
+
+
+pub fn refract(uv: Vector3, n: Vector3, etai_over_etat: f64) -> Vector3 {
+    let cos_theta = dot_product(-uv, n).min(1.0);
+
+    let r_out_perp = etai_over_etat * (uv + cos_theta * n);
+    let r_out_parallel = -((1.0 - r_out_perp.length_squared()).abs()).sqrt() * n;
+
+    return r_out_perp + r_out_parallel;
+}
+
+pub fn random_in_unit_disk() -> Vector3 {
+    loop {
+        let p = Vector3::from(random_f64_in_range(-1.0..1.0), random_f64_in_range(-1.0..1.0), 0.0);
+        if p.length_squared() < 1.0 {
+            return p;
+        }
+    }
 }
